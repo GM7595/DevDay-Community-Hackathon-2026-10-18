@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.*
+!.env.example
+cookies*.json
+data/
+coverage/
+
+# Temporary Sites migration scaffold
+tibo-reset/runtime-starter/
