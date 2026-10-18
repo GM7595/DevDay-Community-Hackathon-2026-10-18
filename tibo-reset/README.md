@@ -1,97 +1,89 @@
 # tibo-reset
 
-Tibo (`@thsottiaux`) の直近100件の公開投稿と返信を取得し、**Decisions API** で「今後24時間以内に臨時リセットが起きるか」を0–100で表示する実験用 CLI。根拠候補の投稿URL・日時・分類と、文脈の欠落も保存します。
+X **公式API v2** から `@thsottiaux` の直近100件の公開投稿・返信を取得し、OpenAI Decisions APIでCodexの臨時使用枠リセットを予測します。通常の5時間・週次更新は対象外です。Cookie認証・ゲスト取得・非公式APIへのフォールバックはありません。
 
-**現時点の的中率は未検証です。** 数値は未来の出来事についての未校正のモデル推定で、実際の発生確率を保証しません。根拠不足・回答拒否時はスコアを `null` とし「判定保留」と表示します。投稿がないことを0%と扱いません。
+ホスト先: https://tibo-reset-watch.soumame.chatgpt.site （現在は本人のみ閲覧）
 
-## 実行
+## 設定
 
-Node.js 22 以上が必要です。
+Node.js 22以上。外部SDKなしで公式APIを呼び出します。
 
 ```sh
 cd tibo-reset
-npm ci --ignore-scripts
+npm ci
 cp .env.example .env
 ```
 
-`.env` に `OPENAI_API_KEY`、自分の X セッションの `X_AUTH_TOKEN` (`auth_token`)、`X_CT0` (`ct0`) をローカルで設定してください。Cookie はログイン済みブラウザーの開発者ツール → Application/Storage → Cookies → `https://x.com` で確認できます。Cookie を発行した OS に `X_PLATFORM` を合わせます。このファイルと取得データは Git 管理から除外しています。秘密値をチャットへ貼り付ける必要はありません。
+`.env` または `.env.cloud` に以下を設定します。CLIは両方を読み、`.env.cloud` が優先されます。秘密値をチャットに貼る必要はありません。
+
+- `X_BEARER_TOKEN`: X Developer Console → App → Keys and Tokens の **app-only Bearer Token**。API Key / API Key Secret / Cookieではありません。
+- `OPENAI_API_KEY`: Decisions APIを呼び出すOpenAIキー。
+
+Sitesのクラウド実行では、同名のシークレットをSites環境変数に設定してデプロイします。ローカルenvファイルはアップロードしません。旧 `X_AUTH_TOKEN` / `X_CT0` / `X_PLATFORM` は不要です。
+
+APIの閲覧権限・利用枠・課金設定はX Developer Consoleで確認してください。トークンの失効時には再設定します。
+
+## CLI
 
 ```sh
-# 取得 → data/posts.json → Decisions → data/report.json
-npm start -- run --username thsottiaux --count 100 --hours 24
-
-# 取得と解析を分ける。解析時に X への接続は不要
 npm start -- collect --count 100 --out data/posts.json
-npm start -- analyze --input data/posts.json --target codex --hours 24
+npm start -- analyze --input data/posts.json --signals --out data/report-with-signals.json
+npm start -- run --count 100 --hours 24 --signals
 
-# 金額としての OpenAI API credit を対象にする場合
-npm start -- analyze --input data/posts.json --target api-credit
-```
-
-`codex` は Codex サブスクリプションの臨時の使用枠補充、`api-credit` は金額としての API クレジット補充です。通常の5時間・週次更新や、個人が保存済みリセットを使う行為は対象外です。既定対象は `codex`、予測期間は解析時点から24時間です。`--hours` は1–168時間、`--count` は1–190件を指定できます。
-
-`--guest` で未認証取得も試せますが、X 側が拒否したり、返信を返さなかったりすることがあります。ログインが必要な場合は終了します。認証制限やチャレンジを迂回する処理はありません。
-
-2026年10月18日の動作確認では、ゲスト取得は99件を返しましたが、最新日時は2025年11月19日でした。**取得件数だけでは「直近100件」の保証になりません。** このデータから現在のスコアは算出していません。最新の投稿を取得できるかは有効なログインセッションでの追加検証が必要です。
-
-## API を呼ばずに確認
-
-```sh
-npm test
+# APIを呼ばず、合成データでリクエストだけ作る
 npm start -- analyze --input examples/synthetic-posts.json \
   --as-of 2026-10-18T06:00:00Z --dry-run
+npm test
 ```
 
-サンプルは架空アカウントの**合成データ**で、Tibo の実際の投稿ではありません。dry-run は OpenAI API を呼ばず、`data/decisions-request.json` を作ります。`run --dry-run` は X 取得を行うため、完全オフラインでの確認には上記 `analyze` を使います。
+`--count` は1–190件、`--hours` は1–168時間。`--context-limit 0–100` は返信元・引用を追加取得する**投稿ID数**の上限（既定20）です。`--target api-credit` は金額としてのAPIクレジットを対象にする任意モードです。
 
-インポート JSON の最小形式:
+## 公式APIの取得
 
-```json
-{
-  "username": "thsottiaux",
-  "source": "manual-import",
-  "posts": [{
-    "id": "1234567890123456789",
-    "author": "thsottiaux",
-    "createdAt": "2026-10-18T05:00:00Z",
-    "text": "実際に取得した投稿本文"
-  }]
-}
-```
+- `GET /2/users/by/username/:username` でユーザーIDと公開設定を確認。
+- `GET /2/users/:id/tweets` を `exclude=retweets` で取得。返信は除外しません。`pagination_token` でページを送り、重複・他人の投稿・リポストを除きます。
+- `post.fields` と `expansions` で長文、投稿日時、著者、返信先・引用を取得。不足する文脈だけ `GET /2/tweets?ids=…` で一括補完します。
+- 欠落・削除・非公開の投稿は補いません。著者や日時も推測せず、不足を記録します。添付画像は公式APIのmedia展開から取得し、Decisionsへ本文と一緒に渡します。リンク先記事・会話全体は取得しません。
+- 401（認証）・403（アクセス権）・402（課金・クレジット）・429（レート制限）を区別し、自動再試行せず終了します。エラー応答の本文や認証ヘッダーは出力しません。
 
-`parent` と `quoted` には同じ形式の投稿を付けられます。URL は ID と author から再構成し、モデルが作ったURLは採用しません。
+`source: "x-official-api"` を保存します。移行前の保存データを公式取得済みとして扱わず、ホスト画面は公式取得の成功後に新しい履歴を開始します。手動インポートは来歴未検証として扱います。
 
-## 処理とスコアの意味
+## スコア
 
-1. fa0311 氏の `twitter-openapi-typescript` で `UserTweetsAndReplies` をカーソル取得します。本人の投稿と返信を数え、広告・単純なリポスト・重複を除外します。古い固定投稿の影響を減らすため、指定件数を満たしたあと1ページ追加し、日時順で指定件数を選びます。X の表示制限などにより完全性は保証できません。
-2. 長文投稿の本文と引用元の著者を保持します。返信先が手元にない場合は `TweetDetail` で補います。追加取得は既定20件（`--context-limit 0–100`）。不足・削除・取得失敗は記録します。画像内容・リンク先記事・会話全体は取得しません。
-3. `POST https://api.openai.com/v1/decisions` に全投稿の文脈を渡します。現行資料に従いモデルは `gpt-6-luna`。未来のリセット確率と根拠の充足度を `predicate` で質問し、各投稿を `choice` で「未来の予告・実施済み・否定・間接的示唆・無関係」に分類します。100件なら1リクエスト・102問です。自由文の説明生成は行わず、投稿本文と分類を根拠候補として表示します。
-4. 最新投稿が基準時刻より48時間以上古ければ、OpenAI API を呼ばず `stale_data` として予測を保留します。48時間は入力鮮度の暫定基準です。新しい入力では、予測値に100を掛けた値をスコアにします。根拠充足度が0.5未満、未来に関する根拠候補がない場合、主要質問が回答拒否の場合は表示を保留します。**0.5は暫定の表示基準で、統計的に検証した閾値ではありません。** 生のモデル値は `rawModelProbability`、投稿ごとの分類確信度は `evidence[].confidence` に残します。これらは別の指標です。
+**全体予測**は、解析時点から24時間以内にOpenAI全体の臨時Codexリセットが起きるかの推定です。過去の実施済みリセット、個人の通常更新、願望だけを未来の根拠にはしません。**投稿シグナル**は、その投稿に予告・実施報告・具体的示唆が含まれる確率で、過去の明確な発表も高くなります。全体予測は投稿スコアの平均ではありません。
 
-取得JSON・レポートに日時と取得元を残します。`--as-of` より後の投稿・返信先・引用は入力から除外します。ただし後日取得した過去投稿には編集・削除・選択の偏りがあり、これだけでバックテストはできません。予測精度を測るには、事前に保存したスナップショットと、実際の臨時リセットの正解ラベルを蓄積し、時系列で分離した評価と確率校正が必要です。
+Decisions APIの `gpt-6-luna` に全体予測・根拠の充足度をpredicate、各投稿の内容をchoiceで質問します。時刻の根拠と上限時間帯も質問し、100投稿の全体解析は104問。個別シグナルは100投稿ごとに別リクエスト（200問）です。変更のない公式取得投稿は内容スコアを再利用します。画像・返信元・引用・本人の接続された続報が変わった場合は再採点します。
 
-HTTPエラー・欠落したAPI回答・異常な確率は予測に変換せず終了します。429では取得を止め、自動再試行は行いません。取得間隔は1秒、タイムラインは最大20ページです。API への課金が発生するのは `analyze` / `run` の実解析時です。
+数値は**未校正**で、実際の的中率は未検証です。根拠不足でもモデルの推測確率を表示し、その下に根拠の充足度を使った小さな信頼度を表示します。信頼度は的中率ではありません。画像が読めず信頼度を評価できない場合は —。回答拒否では数値を捏造しません。最新投稿が48時間以上古い場合はOpenAIを呼ばず予測を保留します。表示の0.5閾値や48時間の鮮度基準は暫定です。過去日時で後日取得した投稿を絞り込むだけでは有効なバックテストになりません。
 
-## Sites の表示画面
+## 画像と時刻
 
-ホスト先: https://tibo-reset-watch.soumame.chatgpt.site （本人のみ閲覧）
+Xの `attachments.media_keys` / `media.fields` から写真・memeと動画/GIFの静止プレビューを取得します。本文・画像内の文字・返信/引用・本人の続報を一緒に判断し、meme形式だからといって機械的に低くしません。未取得画像は未解析であり0%ではありません。動画の全フレームは解析しません。
 
-`site/` に、投稿本文・返信元・引用・投稿ごとの示唆確率・全体予測を確認する画面があります。[画面の更新・運用手順](site/README.md) を参照してください。
+画像は公開X画像ホストのみ、認証なし・リダイレクトなしで取得し、inline base64でDecisionsに渡します。1画像2MB、1リクエスト96画像/12MBまで。画像バイナリはメモリー内だけで扱い、公開JSON・ソース・R2には保存しません。
 
-タイムラインの点を選ぶと、投稿本文と文脈を表示します。投稿側のv2スコアは「リセットの予告・実施報告・具体的示唆を含むか」で、過去の明確な発表も対象です。現在から24時間の発生予測は別の指標です。全体予測の履歴は実際に保存した解析結果だけを蓄積します。
+`timing` は、未実施の予告/示唆に具体的な将来時刻の根拠があり、全体予測・時刻根拠・分類が表示条件を満たす場合だけ推定します。投稿時刻と元のタイムゾーンを基準に、2/6/12/24時間以内などの上限を選びます。過去の予告期限や実施済み報告は次回時刻に流用しません。表示はJSTで、根拠不足や期限経過時は「まだ読めない」。秒単位の到着時刻は捏造しません。
+
+UIはETAを主役、発生確率を補助表示にし、投稿はシグナルに応じて色・発光・動きの強さを変えます。アニメーション停止とOSの動きの抑制設定に対応します。
+
+## クラウド運用
+
+Sitesのクラウドタスクが毎時0分（JST）に `POST /api/refresh` を呼び、公式取得→予測→R2保存を行います。同じ時刻の1時間枠での重複実行は `status: current` と保存結果を返し、有料APIを再実行しません。開いている画面は1分ごとに保存結果を読み込みます。Sitesのタスク上限により予測の間隔は1時間です。取得・解析失敗時は最後の正常な**公式APIデータ**を保持します。
+
+[サーバーと画面の運用](site/README.md) / [定期タスクの更新手順](site/UPDATE.md)
 
 ```sh
-# 投稿ごとの示唆確率も含めて解析（全体解析とは別の1リクエストを追加）
-npm start -- analyze --input data/posts.json --signals --out data/report-with-signals.json
-npm run site:export
 npm run site:preview
+# ローカルのフォールバック用seedを更新。クラウドのR2とは別です。
+npm run site:export
 ```
 
-全体予測・投稿の示唆確率・分類確信度を区別します。ブラウザーには API キーや X Cookie を送らず、保存済みの公開投稿と解析結果だけを表示します。Sitesのクラウドタスクで毎時0分（JST）に取得・予測・R2保存を行います。開いている画面は1分ごとに保存結果を読み込みます。Sitesのタスク上限により、予測の実行間隔は1時間です。
+公開範囲の変更はこの実装変更に含みません。
 
-## 参照資料
+## 参照
 
-- [ユーザー指定の TwitterInternalAPIDocument](https://github.com/fa0311/TwitterInternalAPIDocument) — README が、より正確な仕様として `twitter-openapi` を案内しています。
-- [fa0311/twitter-openapi-typescript](https://github.com/fa0311/twitter-openapi-typescript) — 使用している取得ライブラリ。内部 API の変更により動かなくなる場合があります。依存元のデュアルライセンスは同リポジトリを参照してください。
-- [OpenAI Decisions API guide](https://developers.openai.com/api/docs/guides/decisions)
-- [OpenAI Decisions API reference](https://developers.openai.com/api/reference/resources/decisions/methods/create)
+- [X: ユーザーの投稿](https://docs.x.com/x-api/users/get-posts)
+- [X: 投稿の一括取得](https://docs.x.com/x-api/posts/get-posts-by-ids)
+- [X: Bearer Token](https://docs.x.com/fundamentals/authentication/oauth-2-0/bearer-tokens)
+- [X: OpenAPI仕様](https://docs.x.com/openapi.json)
+- [OpenAI Decisions API](https://developers.openai.com/api/docs/guides/decisions)
