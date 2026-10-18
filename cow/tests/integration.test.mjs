@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile, readdir, rm, lstat } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile, readdir, rm, lstat, symlink, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { installCivilization } from "../install-reset-watch.mjs";
@@ -15,7 +15,7 @@ async function fixture(t, html = original) {
   t.after(() => rm(directory, { recursive: true, force: true }));
   await writeFile(path.join(directory, "index.html"), html);
   await writeFile(path.join(directory, "app.js"), "// Existing host application\n");
-  return directory;
+  return realpath(directory);
 }
 
 test("integration preserves the forecast, timeline and host application and copies only eight public assets", async (t) => {
@@ -61,4 +61,47 @@ test("a missing timeline or incomplete markers cause no filesystem mutation", as
     assert.equal(await readFile(path.join(directory, "index.html"), "utf8"), html);
     assert.equal(await readFile(path.join(directory, "app.js"), "utf8"), "// Existing host application\n");
   }
+});
+
+test("Sites integration edits client/index.html while keeping browser assets in public", async (t) => {
+  const site = await fixture(t);
+  await mkdir(path.join(site, "client"));
+  await mkdir(path.join(site, "public"));
+  await writeFile(path.join(site, "client/index.html"), original);
+  // An unrelated static index must not take precedence over Sites' real route.
+  await writeFile(path.join(site, "public/index.html"), "keep this static file");
+  await writeFile(path.join(site, "public/app.js"), "// Existing application\n");
+  const result = await installCivilization(path.join(site, "public"));
+  const html = await readFile(path.join(site, "client/index.html"), "utf8");
+  assert.equal(result.htmlFile, path.join(site, "client/index.html"));
+  assert.ok(html.includes(forecast) && html.includes(timeline));
+  assert.ok(html.indexOf('id="tibo-civilization"') < html.indexOf('id="timeline"'));
+  assert.deepEqual((await readdir(path.join(site, "public/civilization"))).sort(), allowed);
+  assert.equal(await readFile(path.join(site, "public/app.js"), "utf8"), "// Existing application\n");
+  assert.equal(await readFile(path.join(site, "public/index.html"), "utf8"), "keep this static file");
+  await installCivilization(path.join(site, "public"));
+  assert.equal(await readFile(result.htmlFile, "utf8"), html, "Sites installation is idempotent");
+});
+
+test("a separate explicit HTML template is supported", async (t) => {
+  const site = await fixture(t);
+  await mkdir(path.join(site, "public"));
+  const htmlFile = path.join(site, "custom.html");
+  await writeFile(htmlFile, original);
+  const result = await installCivilization(path.join(site, "public"), { htmlFile });
+  assert.equal(result.htmlFile, htmlFile);
+  assert.ok((await readFile(htmlFile, "utf8")).includes('id="tibo-civilization"'));
+  assert.equal(await readFile(path.join(site, "index.html"), "utf8"), original);
+});
+
+test("missing or symlinked HTML templates fail before public assets are created", async (t) => {
+  const site = await fixture(t);
+  const publicDirectory = path.join(site, "public");
+  await mkdir(publicDirectory);
+  await assert.rejects(installCivilization(publicDirectory), /HTML template not found/);
+  await mkdir(path.join(site, "client"));
+  await symlink(path.join(site, "index.html"), path.join(site, "client/index.html"));
+  await assert.rejects(installCivilization(publicDirectory), /regular file, not a symlink/);
+  assert.deepEqual(await readdir(publicDirectory), []);
+  assert.equal(await readFile(path.join(site, "index.html"), "utf8"), original);
 });

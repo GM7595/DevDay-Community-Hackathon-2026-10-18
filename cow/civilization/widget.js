@@ -1,4 +1,4 @@
-import { createCivilization, changePolicy, projectCivilization, rebirthCivilization, POLICIES, ERAS } from "./engine.js";
+import { createCivilization, changePolicy, projectCivilization, rebirthCivilization, restartAfterHistoryGap, POLICIES, ERAS } from "./engine.js";
 import { createScene } from "./scene.js";
 
 const STORAGE_KEY = "tibo-civilization:v1";
@@ -66,6 +66,7 @@ export function mountCivilization(element, { snapshot = null, assetBase = new UR
       <fieldset class="cv-policy"><legend>みんなの働き方</legend><div class="policy-choices"><button class="policy-button" data-policy="conserve" type="button" aria-pressed="false"><strong>🌱 節約</strong><span>満タンで7日</span><small>発展 ×0.35</small></button><button class="policy-button" data-policy="normal" type="button" aria-pressed="true"><strong>☀ ふつう</strong><span>満タンで5日</span><small>発展 ×1.0</small></button><button class="policy-button" data-policy="sprint" type="button" aria-pressed="false"><strong>⚡ 全力</strong><span>満タンで3日</span><small>発展 ×1.6</small></button></div><p class="policy-help" data-policy-help>発展と持久力を、ほどよく両立。迷ったら、ふつうで。</p></fieldset>
       <div class="cv-notice" data-tone="normal"><span class="notice-icon" aria-hidden="true">↻</span><div class="notice-content"><p class="notice-title" data-notice-title>RESETのお知らせを待っています</p><p class="notice-copy" data-notice-copy>告知を確認できると、街の枠が100%に戻ります。</p></div></div>
       <button class="rebirth-button" data-rebirth type="button" hidden>新しい文明をはじめる</button>
+      <button class="rebirth-button" data-restart type="button" hidden>記録を残して新しくはじめる</button>
       <section class="demo-result" aria-label="体験結果" hidden><h3 data-result-title>体験の結果</h3><p data-result-copy></p><div class="demo-result-stats"><div><strong data-result-era></strong><span>たどり着いた時代</span></div><div><strong data-result-days></strong><span>文明が続いた時間</span></div></div></section>
       <div class="cv-bottom"><button class="demo-launch" data-demo type="button"><span aria-hidden="true">▶</span><span data-demo-label>2分で体験する</span></button><span class="save-note" data-save>このブラウザに自動保存<br/>閉じている間も、時間が進みます。</span></div>
       <div class="demo-settings"><label for="demo-scenario">体験シナリオ</label><select id="demo-scenario"><option value="regular">4日ごとにサンプルRESET</option><option value="none">RESETが来なかったら？</option></select><span class="demo-clock" data-demo-clock hidden>00:00 / 02:00</span></div><div class="demo-timeline" hidden><span></span></div>
@@ -78,7 +79,7 @@ export function mountCivilization(element, { snapshot = null, assetBase = new UR
     mode: find("[data-mode-label]"), era: find("[data-era]"), level: find("[data-level]"), name: find("[data-name]"), generation: find("[data-generation]"),
     quota: find("[data-quota]"), quotaBar: find("[data-quota-bar]"), meter: find(".quota-track"), timeLabel: find("[data-time-label]"), time: find("[data-time]"), timeCaption: find("[data-time-caption]"),
     next: find("[data-era-next]"), research: find("[data-research]"), eraBar: find("[data-era-bar]"), progress: find(".era-track"), policy: [...card.querySelectorAll(".policy-button")], policyHelp: find("[data-policy-help]"),
-    notice: find(".cv-notice"), noticeTitle: find("[data-notice-title]"), noticeCopy: find("[data-notice-copy]"), rebirth: find("[data-rebirth]"), save: find("[data-save]"), announcement: find("[data-announcement]"),
+    notice: find(".cv-notice"), noticeTitle: find("[data-notice-title]"), noticeCopy: find("[data-notice-copy]"), rebirth: find("[data-rebirth]"), restart: find("[data-restart]"), save: find("[data-save]"), announcement: find("[data-announcement]"),
     nameDetails: find(".name-details"), nameInput: find(".name-form input"), demoStrip: find(".demo-strip"), demoLabel: find("[data-demo-label]"), scenario: find("#demo-scenario"), demoClock: find("[data-demo-clock]"), demoTimeline: find(".demo-timeline"),
     result: find(".demo-result"), resultTitle: find("[data-result-title]"), resultCopy: find("[data-result-copy]"), resultEra: find("[data-result-era]"), resultDays: find("[data-result-days]"),
   };
@@ -134,6 +135,8 @@ export function mountCivilization(element, { snapshot = null, assetBase = new UR
     return { notices: Array.isArray(feed?.notices) ? feed.notices : [], confirmedThrough: Number.isFinite(feed?.confirmedThrough) ? feed.confirmedThrough : null };
   }
 
+  function hasHistoryGap() { return feed?.status === "gap" && feed.reason === "rolling_window_gap"; }
+
   function currentNow() { return demo ? demo.epoch + demo.elapsed * DEMO_HOURS_PER_SECOND * HOUR : Math.max(Date.now(), journal.createdAt); }
 
   function demoOptions() {
@@ -168,7 +171,9 @@ export function mountCivilization(element, { snapshot = null, assetBase = new UR
       nodes.noticeCopy.textContent = projection.rebirthAvailable ? "新しいRESETの告知が届いています。次の文明を、ここからはじめられます。" : isSample ? "枠切れから24時間、RESETが来ませんでした。働き方を変えて、もう一度試せます。" : "新しいRESETの告知が届くと、次の文明をはじめられます。";
     } else if (state === "pending") {
       nodes.noticeTitle.textContent = "告知を確認できるまで、結末は保留。";
-      nodes.noticeCopy.textContent = "取得できていないRESETがあるかもしれません。接続が戻ると、告知時刻から街の時間を計算し直します。";
+      nodes.noticeCopy.textContent = hasHistoryGap()
+        ? "過去の結末は確認できません。記録を残して、新しい文明を今からはじめられます。"
+        : "取得できていないRESETがあるかもしれません。接続が戻ると、告知時刻から街の時間を計算し直します。";
     } else if (state === "stopped") {
       nodes.noticeTitle.textContent = "Tibo、枠ください。街が止まっています。";
       nodes.noticeCopy.textContent = `RESETなしで終わるまで、あと${duration(projection.extinctionInHours)}。働き方を変えても枠は回復しません。`;
@@ -231,6 +236,7 @@ export function mountCivilization(element, { snapshot = null, assetBase = new UR
     nodes.policyHelp.textContent = { conserve: "長く続けることを大切に。発展はゆっくりですが、満タンなら7日動けます。", normal: "発展と持久力を、ほどよく両立。迷ったら、ふつうで。", sprint: "発展を急ぐぶん、3日で枠切れ。次のRESETに間に合うかが勝負です。" }[projection.policy];
     renderNotice(projection);
     nodes.rebirth.hidden = !projection.rebirthAvailable || Boolean(demo);
+    nodes.restart.hidden = Boolean(demo) || projection.status !== "pending" || !hasHistoryGap();
     nodes.save.classList.toggle("is-warning", !storageAvailable || storageCorrupt);
     nodes.save.textContent = demo ? "体験の結果は保存されません。" : storageCorrupt ? "保存データを読み取れません。元の記録は保護しています。" : !storageAvailable ? "保存できません。このページを閉じると記録が失われます。" : "このブラウザに自動保存 · 閉じている間も時間が進みます。";
     nodes.demoLabel.textContent = demo ? demo.finished ? "もう一度体験する" : "体験を最初から" : "2分で体験する";
@@ -280,6 +286,18 @@ export function mountCivilization(element, { snapshot = null, assetBase = new UR
   on(nodes.rebirth, "click", () => {
     if (demo) return;
     readStored(); journal = rebirthCivilization(journal, currentNow(), realOptions()); saveJournal(); seenResetIds = null; render(); announce("新しい文明がはじまりました。");
+  });
+  on(nodes.restart, "click", () => {
+    if (demo) return;
+    readStored();
+    const next = restartAfterHistoryGap(journal, currentNow(), { ...realOptions(), historyGap: hasHistoryGap() });
+    if (next.generation === journal.generation) return;
+    journal = next;
+    saveJournal();
+    feed = null; seenResetIds = null; previousStatus = null;
+    render();
+    announce("過去の結末は保留のまま記録を残し、新しい文明をはじめました。");
+    nodes.nameDetails.querySelector("summary").focus();
   });
   on(find(".name-form"), "submit", (event) => {
     event.preventDefault();

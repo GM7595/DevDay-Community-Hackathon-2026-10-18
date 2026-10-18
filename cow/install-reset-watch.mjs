@@ -8,10 +8,23 @@ const markerStart = '<!-- TIBO CIVILIZATION START -->';
 const markerEnd = '<!-- TIBO CIVILIZATION END -->';
 const embed = `${markerStart}\n<section id="tibo-civilization" aria-label="Tiboのリセットで育つ文明"></section>\n<script type="module" src="/civilization/bootstrap.js"></script>\n${markerEnd}`;
 
-export async function installCivilization(publicDirectory) {
+export async function installCivilization(publicDirectory, { htmlFile } = {}) {
   const target = await realpath(publicDirectory);
-  const indexPath = path.join(target, 'index.html');
-  if (await realpath(indexPath) !== indexPath) throw new Error('index.html must not be a symlink');
+  // Sites serves client/index.html through app/route.ts; public/ only holds
+  // assets. Prefer that template, while retaining support for static hosts.
+  const candidates = htmlFile ? [path.resolve(htmlFile)]
+    : [path.resolve(target, '../client/index.html'), path.join(target, 'index.html')];
+  let indexPath;
+  for (const candidate of candidates) {
+    let info;
+    try { info = await lstat(candidate); }
+    catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+    const resolved = await realpath(candidate);
+    if (!info.isFile() || (!htmlFile && resolved !== candidate)) throw new Error('HTML template must be a regular file, not a symlink');
+    indexPath = resolved;
+    break;
+  }
+  if (!indexPath) throw new Error('HTML template not found; supply its path after the public directory');
   let html = await readFile(indexPath, 'utf8');
   if (html.includes(markerStart) !== html.includes(markerEnd)) throw new Error('Incomplete civilization installation markers');
   if (html.includes(markerStart)) {
@@ -37,13 +50,13 @@ export async function installCivilization(publicDirectory) {
     await writeFile(file, bytes);
   }
   await writeFile(indexPath, html);
-  return { destination, assets: files.map(([name]) => name) };
+  return { destination, htmlFile: indexPath, assets: files.map(([name]) => name) };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const directory = process.argv[2] || path.join(root, '../tibo-reset/site/public');
   try {
-    const result = await installCivilization(directory);
+    const result = await installCivilization(directory, { htmlFile: process.argv[3] });
     console.log(`Installed ${result.assets.length} civilization assets in ${result.destination}`);
   } catch (error) {
     console.error(`Civilization installation failed: ${error.message}`);

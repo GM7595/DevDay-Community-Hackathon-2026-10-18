@@ -43,6 +43,8 @@ The threshold is an explicit game rule, not a calibrated guarantee. A completed 
 
 Collection continuity uses `collectedAt`, `asOf` and the actual oldest post in the rolling window. If the feed is unavailable or the user's absence outlasts that window, the game shows an unconfirmed state instead of declaring a missing reset. Low-confidence classifications do not count under the game rule; they do not stop the collection clock.
 
+If the city is stuck awaiting confirmation because its missing history has fallen outside the rolling window, **記録を残して新しくはじめる** starts a new generation at the current time with 100% game quota and zero research. The previous journal is retained in browser storage with its outcome marked unconfirmed; no death or real reset is inferred. This explicit recovery is available only for a pending city with a confirmed history gap, not during a temporary network failure or experience mode. Future feed updates cover the new generation normally.
+
 ## Integrate into Reset Watch later
 
 The component is self-contained under `civilization/` and uses Shadow DOM to avoid changing the host's styles. With the actual Site source available:
@@ -51,7 +53,9 @@ The component is self-contained under `civilization/` and uses Shadow DOM to avo
 node cow/install-reset-watch.mjs tibo-reset/site/public
 ```
 
-The installer places the card before the existing timeline and copies only its browser assets. It is idempotent, retains the existing prediction/timeline UI, and reads `/snapshot.json` on the host. It does not overwrite the Worker, secrets or publishing identity. Then validate and publish using the existing Site owner's source workflow. Installing files locally does not deploy the hosted Site.
+The installer edits the Site's `client/index.html`, places the card before the existing timeline, and copies browser assets into `public/civilization/`. It also supports static hosts with `public/index.html`. To select another template explicitly, append its path as the second argument, for example `node cow/install-reset-watch.mjs tibo-reset/site/public tibo-reset/site/client/index.html`.
+
+It is idempotent, retains the existing prediction/timeline UI, and reads `/snapshot.json` on the host. It does not overwrite the Worker, secrets or publishing identity. Then validate and publish using the existing Site owner's source workflow. Installing files locally does not deploy the hosted Site.
 
 To mount manually, import `mountCivilization` from `widget.js`, provide an element and normalized feed, then call `updateSnapshot(feed)` after fresh collection. `reset-feed.js` converts the upstream report into that feed; persist its result as `previous`. The engine processes cumulative notices by ID and timestamp.
 

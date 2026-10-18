@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { POLICIES, ERAS, createCivilization, changePolicy, projectCivilization, rebirthCivilization } from '../civilization/engine.js';
+import { POLICIES, ERAS, createCivilization, changePolicy, projectCivilization, rebirthCivilization, restartAfterHistoryGap } from '../civilization/engine.js';
+import { normalizeResetFeed } from '../civilization/reset-feed.js';
 
 const HOUR = 3_600_000;
 const START = Date.UTC(2026, 9, 18);
@@ -191,4 +192,72 @@ test('rebirth while feed is stale begins a reloadable generation at its own birt
   const reloaded = JSON.parse(JSON.stringify(reborn));
   assert.equal(projectCivilization(reloaded, at(261)).status, 'alive');
   assert.equal(projectCivilization(reloaded, at(404)).status, 'pending');
+});
+
+test('history-gap restart preserves the unsettled journal without certifying a death or reset', () => {
+  const pending = project(city(), 240, [notice('missed-window', 239)], { confirmedThrough: at(1) });
+  const before = JSON.stringify(pending.journal);
+  const next = restartAfterHistoryGap(pending.journal, at(240), { historyGap: true });
+  assert.equal(JSON.stringify(pending.journal), before, 'the previous journal is immutable');
+  assert.equal(next.generation, 2);
+  assert.equal(next.id, pending.id);
+  assert.equal(next.name, pending.name);
+  assert.equal(next.createdAt, at(240));
+  assert.equal(next.confirmedThrough, at(240));
+  assert.equal(next.ancestors[0].outcome, 'unconfirmed');
+  assert.equal(next.ancestors[0].deathAt, null);
+  assert.equal(next.ancestors[0].archivedAt, at(240));
+  assert.deepEqual(next.ancestors[0].journal, pending.journal);
+  const reloaded = JSON.parse(JSON.stringify(next));
+  const newborn = projectCivilization(reloaded, at(240));
+  assert.equal(newborn.status, 'alive');
+  assert.equal(newborn.quota, 100);
+  assert.equal(newborn.research, 0);
+  assert.equal(newborn.lastResetAt, null);
+  assert.equal(newborn.rebirthAvailable, false);
+  assert.deepEqual(newborn.appliedNoticeIds, []);
+});
+
+test('restart cannot bypass a live city, confirmed death or a temporary outage', () => {
+  for (const hours of [1, 130, 150]) {
+    const current = project(city(), hours);
+    const next = restartAfterHistoryGap(current.journal, at(hours), { historyGap: true });
+    assert.equal(next.generation, 1);
+    assert.deepEqual(next.ancestors, []);
+  }
+  const pending = project(city(), 200, [], { confirmedThrough: at(1) });
+  assert.equal(restartAfterHistoryGap(pending.journal, at(200)).generation, 1);
+  // A delayed notice that repairs the loss also removes restart eligibility.
+  assert.equal(restartAfterHistoryGap(pending.journal, at(200), {
+    historyGap: true, notices: [notice('repaired', 96)],
+  }).generation, 1);
+});
+
+test('long-absence recovery reconnects to the rolling feed and future real resets', () => {
+  const entry = (id, hours, completed = false) => ({
+    post: { id, author: 'thsottiaux', createdAt: new Date(at(hours)).toISOString() },
+    signalKind: completed ? 'completed' : 'unrelated', signalKindConfidence: 0.99, signalStatus: 'scored',
+  });
+  const report = (hours, evidence) => ({ username: 'thsottiaux', target: 'codex', source: 'x-official-api',
+    signalScoringVersion: 3, asOf: new Date(at(hours)).toISOString(), collectedAt: new Date(at(hours)).toISOString(), evidence });
+  const first = normalizeResetFeed(report(1, [entry('1', -1)]), { now: at(1), createdAt: START });
+  const gap = normalizeResetFeed(report(240, [entry('2', 228), entry('3', 239, true)]), {
+    now: at(240), createdAt: START, previous: first,
+  });
+  assert.equal(gap.status, 'gap');
+  const pending = projectCivilization(city(), at(240), gap);
+  assert.equal(pending.status, 'pending');
+  const next = restartAfterHistoryGap(pending.journal, at(240), { ...gap, historyGap: true });
+  const resumed = normalizeResetFeed(report(241, [entry('2', 228), entry('3', 239, true), entry('4', 240.5, true)]), {
+    now: at(241), previous: gap, createdAt: next.createdAt,
+  });
+  assert.equal(resumed.status, 'current');
+  assert.equal(resumed.confirmedThrough, at(241));
+  assert.deepEqual(resumed.notices.map(item => item.eventId), ['x:4']);
+  const playing = projectCivilization(JSON.parse(JSON.stringify(next)), at(241), resumed);
+  assert.equal(playing.status, 'alive');
+  assert.equal(playing.lastResetAt, at(240.5));
+  assert.deepEqual(playing.appliedNoticeIds, ['x:4']);
+  assert.equal(playing.generation, 2);
+  assert.equal(playing.journal.ancestors[0].deathAt, null);
 });

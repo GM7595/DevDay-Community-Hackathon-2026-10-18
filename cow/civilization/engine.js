@@ -211,3 +211,22 @@ export function rebirthCivilization(journal, now, options = {}) {
     }],
   };
 }
+
+/** Explicit recovery when a rolling-window gap can no longer settle a loss. */
+export function restartAfterHistoryGap(journal, now, { historyGap = false, ...options } = {}) {
+  const previous = projectCivilization(journal, now, options);
+  if (!historyGap || previous.status !== 'pending') return previous.journal;
+  const next = createCivilization({ id: journal.id, name: journal.name, now });
+  return {
+    ...next,
+    generation: journal.generation + 1,
+    consumedSeedEventIds: [...(journal.consumedSeedEventIds || [])],
+    ancestors: [...(journal.ancestors || []), {
+      generation: journal.generation, name: journal.name, createdAt: journal.createdAt,
+      deathAt: null, archivedAt: now, outcome: 'unconfirmed',
+      research: previous.research, era: previous.era.id,
+      // Retain the old timeline without recursively duplicating its ancestors.
+      journal: { ...previous.journal, ancestors: [] },
+    }],
+  };
+}
