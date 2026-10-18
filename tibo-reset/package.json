@@ -8,13 +8,10 @@
     "node": ">=22"
   },
   "scripts": {
-    "start": "node --env-file-if-exists=.env src/cli.js",
+    "start": "node --env-file-if-exists=.env --env-file-if-exists=.env.cloud src/cli.js",
     "test": "node --test",
     "site:export": "node scripts/export-site.mjs",
-    "site:refresh": "node --env-file-if-exists=.env scripts/refresh-site.mjs",
+    "site:refresh": "node --env-file-if-exists=.env --env-file-if-exists=.env.cloud scripts/refresh-site.mjs",
     "site:preview": "npm --prefix site run dev"
-  },
-  "dependencies": {
-    "twitter-openapi-typescript": "0.1.3"
   }
 }

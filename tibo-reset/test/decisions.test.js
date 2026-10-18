@@ -12,6 +12,8 @@ const response = (extra = []) => ({ model: 'gpt-6-luna', answers: [
   { type: 'predicate', name: 'reset_in_window', probability: 0.82 },
   { type: 'predicate', name: 'sufficient_evidence', probability: 0.91 },
   { type: 'choice', name: 'post_1', choice: 'future_announcement', confidence: 0.95 },
+  { type: 'predicate', name: 'timing_supported', probability: 0.1 },
+  { type: 'choice', name: 'timing_window', choice: 'unknown', confidence: 0.95 },
   ...extra,
 ] });
 
@@ -48,7 +50,7 @@ test('request uses Decisions predicates plus per-post choice within the 200 ques
   const data = prepare(corpus(Array.from({ length: 190 }, (_, i) => post(String(i + 1)))), { asOf, count: 190 });
   const request = buildRequest(data);
   assert.equal(request.model, 'gpt-6-luna');
-  assert.equal(request.questions.length, 192);
+  assert.equal(request.questions.length, 194);
   assert.equal(request.questions[0].type, 'predicate');
   assert.equal(request.questions[2].type, 'choice');
   assert.match(request.questions[0].instructions, /untrusted evidence/);
@@ -59,6 +61,44 @@ test('request uses Decisions predicates plus per-post choice within the 200 ques
 test('target separates API monetary credits from Codex limits', () => {
   const data = prepare(corpus([post()]), { asOf, target: 'api-credit' });
   assert.match(buildRequest(data).questions[0].instructions, /monetary API credits/);
+});
+
+test('ETA is a supported future upper bound, never inferred from an occurrence probability alone', () => {
+  const body = response();
+  body.answers.find(answer => answer.name === 'timing_supported').probability = .9;
+  Object.assign(body.answers.find(answer => answer.name === 'timing_window'), { choice: 'within_6h', confidence: .9 });
+  const result = summarize(snapshot(), body);
+  assert.equal(result.timing.status, 'estimated');
+  assert.equal(result.timing.startAt, asOf); assert.equal(result.timing.endAt, '2026-10-18T12:00:00.000Z');
+  assert.deepEqual(result.timing.evidencePostIds, ['1']);
+  for (const change of [
+    value => value.answers[0].probability = .2,
+    value => value.answers[1].probability = .1,
+    value => value.answers[2].choice = 'already_reset',
+    value => value.answers.find(answer => answer.name === 'timing_supported').probability = .3,
+    value => value.answers.find(answer => answer.name === 'timing_window').confidence = .3,
+    value => Object.assign(value.answers.find(answer => answer.name === 'timing_window'), { type: 'refusal' }),
+  ]) { const copy = structuredClone(body); change(copy); assert.equal(summarize(snapshot(), copy).timing.status, 'unknown'); }
+  const short = prepare(corpus([post()]), { asOf, hours: 1 });
+  assert.throws(() => summarize(short, body), /Invalid timing/);
+});
+
+test('forecast actually sends meme pixels with text and withholds an estimate if a recent image cannot be read', async () => {
+  const data = prepare(corpus([post('1', { media: [{ key: 'a', type: 'photo', url: 'https://pbs.twimg.com/media/demo.jpg' }] })]), { asOf });
+  const fetchFn = async (_, init) => {
+    const input = JSON.parse(init.body).input;
+    assert.equal(input[0].content[2].type, 'input_image');
+    assert.match(input[0].content[2].image_url, /^data:image\/jpeg;base64,/);
+    return new Response(JSON.stringify(response()));
+  };
+  const result = await analyze(data, { apiKey: 'fake', fetchFn,
+    mediaFetchFn: async () => new Response('image', { headers: { 'content-type': 'image/jpeg' } }) });
+  assert.equal(result.mediaAnalysis.imageCount, 1); assert.equal(result.status, 'estimated');
+  const unread = await analyze(data, { apiKey: 'fake', fetchFn: async () => new Response(JSON.stringify(response())),
+    mediaFetchFn: async () => new Response(null, { status: 404 }) });
+  assert.equal(unread.rawModelProbability, .82); assert.equal(unread.forecastConfidence, null);
+  assert.equal(unread.timing.status, 'unknown');
+  assert.equal(unread.status, 'insufficient_evidence');
 });
 
 test('reports an uncalibrated estimate with verifiable source IDs', () => {

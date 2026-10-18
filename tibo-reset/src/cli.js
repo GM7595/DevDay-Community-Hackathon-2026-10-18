@@ -12,14 +12,13 @@ npm start -- analyze --input data/posts.json [--target codex|api-credit] [--hour
 npm start -- run [--count 100] [--target codex] [--hours 24]
 
   --as-of ISO_DATE     予測の基準時刻（既定: 現在）
-  --context-limit 20   返信元を追加取得する上限（0–100）
-  --guest             認証せず取得を試す（返信や取得件数が制限される可能性あり）
+  --context-limit 20   返信元・引用を追加取得する投稿数の上限（0–100）
   --dry-run           Decisions リクエストだけ生成。OpenAI を呼び出さない
   --signals           投稿ごとの「リセットの発表・示唆を含む確率」も解析（100件ごとに追加1リクエスト）
   --out PATH          collect: 投稿 JSON / analyze・run: レポート JSON
   --help              このヘルプ
 
-鍵と X セッションは .env に設定。数値は未校正のモデル予測です。`;
+OPENAI_API_KEY と X_BEARER_TOKEN は .env に設定。数値は未校正のモデル予測です。`;
 
 async function save(path, value) {
   await mkdir(dirname(path), { recursive: true });
@@ -33,7 +32,7 @@ async function main() {
       username: { type: 'string' }, count: { type: 'string', default: '100' },
       hours: { type: 'string', default: '24' }, target: { type: 'string', default: 'codex' },
       'as-of': { type: 'string' }, 'context-limit': { type: 'string', default: '20' },
-      input: { type: 'string' }, out: { type: 'string' }, guest: { type: 'boolean' },
+      input: { type: 'string' }, out: { type: 'string' },
       'dry-run': { type: 'boolean' }, signals: { type: 'boolean' }, help: { type: 'boolean' },
     } });
   } catch { throw new AppError('Invalid arguments. Run npm start -- --help.'); }
@@ -60,9 +59,9 @@ async function main() {
     if (command === 'run' && !values['dry-run'] && !process.env.OPENAI_API_KEY) {
       throw new AppError('OPENAI_API_KEY is required in .env.');
     }
-    const client = await createXClient({ guest: values.guest });
+    const client = await createXClient();
     corpus = await collect({ client, username: values.username ?? 'thsottiaux', count,
-      guest: values.guest, contextLimit, onProgress: (line) => console.error(line) });
+      contextLimit, onProgress: (line) => console.error(line) });
     const postsPath = command === 'collect' ? values.out ?? 'data/posts.json' : 'data/posts.json';
     await save(postsPath, corpus);
     console.error(`Posts saved: ${postsPath}`);
@@ -90,7 +89,7 @@ async function main() {
 }
 
 main().catch((error) => {
-  // SDK errors may contain request headers/cookies; never dump them or their stack.
+  // Never dump arbitrary upstream errors, request headers or their stack.
   console.error(error instanceof AppError ? error.message :
     'Operation failed. Check local file permissions, network access, and upstream X API compatibility.');
   process.exitCode = 1;

@@ -15,7 +15,7 @@ process.stdin.on('data', async (chunk) => {
       headers: { 'OAI-Sites-Authorization': `Bearer ${input.token}` }, signal: AbortSignal.timeout(300000) });
     const body = await response.json();
     // Public result metadata only. Never dump an upstream error or full response.
-    const fields = ['status','errorCode','errorDetail','failedStage','collectedAt','newestPostAt','postCount',
+    const fields = ['source','status','errorCode','errorDetail','failedStage','collectedAt','newestPostAt','postCount',
       'asOf','lastSuccessAt','nextExpectedAt','rescoredPostCount'];
     const result = Object.fromEntries(fields.filter(key => Object.hasOwn(body,key)).map(key=>[key,body[key]]));
     if (body.operation) result.operation = body.operation;

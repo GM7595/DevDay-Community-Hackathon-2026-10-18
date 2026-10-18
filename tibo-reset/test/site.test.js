@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { publicSnapshot, selectEntries, viewStatus } from '../site/public/model.js';
+import { publicSnapshot, selectEntries, signalHeat, timingView, viewStatus } from '../site/public/model.js';
 import { enrichPostSignals } from '../src/decisions.js';
 
 const asOf = '2026-10-18T06:00:00.000Z';
-const report = () => ({ username: 'demo_account', target: 'codex', asOf,
+const report = () => ({ username: 'demo_account', target: 'codex', source: 'x-official-api', asOf,
   deadline: '2026-10-19T06:00:00.000Z', status: 'insufficient_evidence', score: null,
-  source: 'x-internal-api', rawModelProbability: 0.09, evidenceSufficiency: 0,
+  source: 'x-official-api', rawModelProbability: 0.09, evidenceSufficiency: 0,
   postCount: 2, requestedCount: 2,
   evidence: [
     { post: { id: '1', author: 'demo_account', text: 'Synthetic announcement', createdAt: '2026-10-18T05:00:00Z',
@@ -18,14 +18,15 @@ const report = () => ({ username: 'demo_account', target: 'codex', asOf,
 });
 
 test('Site export allowlists public fields, rebuilds URLs, separates metrics and retains context', () => {
-  const data = publicSnapshot({ ...report(), OPENAI_API_KEY: 'fake-private-key', X_AUTH_TOKEN: 'fake-cookie',
+  const data = publicSnapshot({ ...report(), OPENAI_API_KEY: 'fake-private-key', X_BEARER_TOKEN: 'fake-bearer',
     unrelated: { password: 'not-for-export' } });
   const json = JSON.stringify(data);
-  assert.ok(!json.includes('fake-private-key') && !json.includes('fake-cookie') && !json.includes('password'));
+  assert.ok(!json.includes('fake-private-key') && !json.includes('fake-bearer') && !json.includes('password'));
   assert.equal(data.evidence[0].post.url, 'https://x.com/demo_account/status/1');
   assert.equal(data.evidence[0].signalProbability, 0.8);
   assert.equal(data.evidence[0].confidence, 0.75);
   assert.equal(data.rawModelProbability, 0.09);
+  assert.equal(data.forecastConfidence, 0);
   assert.equal(data.score, null);
   assert.equal(data.evidence[0].post.parent.text, 'Synthetic parent context');
 });
@@ -67,6 +68,23 @@ test('stored forecasts expire and stale source data never appears current', () =
   assert.equal(viewStatus(data, Date.parse(asOf)), 'stale_data');
 });
 
+test('ETA export rejects unsupported deadlines and stops displaying an elapsed deadline', () => {
+  const data = report(); data.status = 'estimated'; data.rawModelProbability = .8;
+  data.timing = { status: 'estimated', startAt: asOf, endAt: '2026-10-18T12:00:00.000Z', confidence: .9, support: .9, evidencePostIds: ['1'] };
+  const saved = publicSnapshot(data);
+  assert.equal(timingView(saved, Date.parse(asOf)).available, true);
+  assert.match(timingView(saved, Date.parse(asOf)).label, /21:00まで/);
+  assert.equal(timingView(saved, Date.parse('2026-10-18T13:00:00Z')).available, false);
+  for (const override of [{endAt:'2030-01-01T00:00:00Z'},{confidence:.1},{evidencePostIds:['missing']}])
+    assert.equal(publicSnapshot({...data,timing:{...data.timing,...override}}).timing.status, 'unknown');
+});
+
+test('signal styling increases through cold, warm, hot and super while unknown is not high heat', () => {
+  assert.deepEqual([null, 0, .5, .8, .99].map(value => signalHeat(value).tier), ['cold', 'cold', 'warm', 'hot', 'super']);
+  assert.equal(signalHeat(.99).value, .99);
+  assert.notEqual(signalHeat(.5).color, signalHeat(.99).color);
+});
+
 test('invalid imports cannot inject URL schemes or probabilities outside 0–1', () => {
   const data = report(); data.evidence[0].signalProbability = 7;
   assert.equal(publicSnapshot(data).evidence[0].signalProbability, null);
@@ -95,7 +113,7 @@ test('post signal scoring is a predicate separate from global forecast and class
   assert.equal(enriched.evidence[0].confidence, 0.75);
   assert.equal(enriched.evidence[0].signalProbability, 0.62);
   assert.equal(enriched.evidence[0].signalKind, 'completed');
-  assert.equal(enriched.signalScoringVersion, 2);
+  assert.equal(enriched.signalScoringVersion, 3);
   assert.equal(enriched.evidence[1].signalProbability, null);
 });
 
