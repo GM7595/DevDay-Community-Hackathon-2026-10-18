@@ -6,6 +6,9 @@ cookies*.json
 data/
 coverage/
 
-# Owner-local Sites publishing checkout. Shared source lives in timetable-tool/.
+# Owner-local Sites publishing checkout; source moved to GM7595/auto-timetable.
 /cue/
+
+# Timetable source is maintained in its standalone repository.
+/timetable-tool/
 
