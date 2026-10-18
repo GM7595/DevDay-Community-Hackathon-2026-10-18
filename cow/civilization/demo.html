@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0a0a0d" />
+  <title>tiboっち : civilization — Widget preview</title>
+  <style>
+    * { box-sizing: border-box; } body { margin: 0; padding: 44px 24px 60px; background: #0a0a0d; color: #f1f3e9; font-family: Inter, "Noto Sans JP", system-ui, sans-serif; } main { max-width: 1140px; margin: auto; } header { margin-bottom: 28px; } .brand { font-size: 12px; color: #c7f5a2; letter-spacing: .04em; margin-bottom: 24px; } h1 { font-size: clamp(29px, 5vw, 48px); line-height: 1.25; letter-spacing: -.05em; margin: 0; } h1 span { color: #bfc9b7; font-size: .55em; font-weight: 450; } header p { color: #9fa99e; max-width: 650px; font-size: 13px; line-height: 1.85; margin-top: 16px; } footer { color: #818b80; font-size: 11px; line-height: 1.8; margin-top: 20px; } footer a { color: #c7f5a2; } @media(max-width: 500px) { body { padding: 26px 12px 40px; } header { padding: 0 6px; } .brand { margin-bottom: 18px; } }
+  </style>
+</head>
+<body><main><header><div class="brand">TIBO.RESET? / LITTLE CIVILIZATIONS</div><h1>tiboっち <span>: civilization</span></h1><p>節約する？ それとも全力で発展する？<br />働き方を選んだら、あとは小さな街の暮らしを見守ろう。</p></header><div id="civilization"></div><footer>これはウィジェットの単独プレビューです。実際の告知フィードは未接続のため、接続待ちと表示します。<br />「2分で体験する」では、独立したサンプルの文明を遊べます。<a href="https://github.com/tibo-openai" target="_blank" rel="noopener noreferrer">Tiboの公開プロフィール写真</a>を使用した非公式ファンゲームです。</footer></main>
+<script type="module">
+  import { mountCivilization } from "./widget.js";
+  const widget = mountCivilization(document.querySelector("#civilization"), {
+    snapshot: { notices: [], confirmedThrough: null, status: "unavailable", forecast: null },
+    assetBase: new URL("../assets/", import.meta.url).href,
+  });
+  window.addEventListener("pagehide", () => widget.destroy(), { once: true });
+</script></body>
+</html>
