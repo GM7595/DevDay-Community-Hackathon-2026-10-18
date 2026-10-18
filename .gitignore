@@ -6,3 +6,6 @@ cookies*.json
 data/
 coverage/
 
+# Owner-local Sites publishing checkout. Shared source lives in timetable-tool/.
+/cue/
+
