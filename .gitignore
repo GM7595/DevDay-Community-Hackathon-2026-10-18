@@ -6,5 +6,3 @@ cookies*.json
 data/
 coverage/
 
-# Temporary Sites migration scaffold
-tibo-reset/runtime-starter/

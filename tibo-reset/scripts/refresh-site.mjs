@@ -25,7 +25,7 @@ try {
   await atomicJson('data/posts.json', corpus);
   await atomicJson('data/report-with-signals.json', report);
   await atomicJson('site/server/seed.json', snapshot);
-  console.log(`Updated local snapshot with ${snapshot.postCount} posts. Republish the Site to update its hosted snapshot.`);
+  console.log(`Updated fallback seed with ${snapshot.postCount} posts. Cloud data is updated through POST /api/refresh, independently of publishing.`);
 } catch (error) {
   console.error(error instanceof AppError ? error.message : 'Update failed. The last displayed snapshot was preserved.');
   process.exitCode = 1;
