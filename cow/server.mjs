@@ -3,15 +3,23 @@ import { readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { handleDecision } from "./src/decisions.js";
+import { handleResetWatch } from "./src/reset-watch.js";
+import { publicFiles as allowedFiles } from "./public-assets.mjs";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const port = Number(process.env.PORT || 4173);
 const types = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".jpg": "image/jpeg", ".png": "image/png", ".webp": "image/webp" };
-const publicFiles = new Set(["index.html", "style.css", "details.css", "game.js", "assets/tibo-avatar.jpg"]);
+const publicFiles = new Set(allowedFiles);
 
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url || "/", "http://localhost");
+    if (url.pathname === "/api/reset-watch") {
+      const response = await handleResetWatch({ method: req.method });
+      res.writeHead(response.status, Object.fromEntries(response.headers.entries()));
+      res.end(req.method === "HEAD" ? undefined : await response.text());
+      return;
+    }
     if (url.pathname === "/api/decisions") {
       let body = "";
       for await (const chunk of req) {
@@ -59,7 +67,7 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(port, process.env.HOST || "127.0.0.1", () => {
-  process.stdout.write(`TIBO SIMULATOR listening on http://localhost:${port}\n`);
+  process.stdout.write(`tiboっち : civilization listening on http://localhost:${port}\n`);
 });
 server.on("error", (error) => {
   process.stderr.write(`Server could not start: ${error.code || "unknown error"}\n`);

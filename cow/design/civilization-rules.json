@@ -1,0 +1,86 @@
+{
+  "version": "proposal-1",
+  "status": "design-only-not-connected",
+  "clock": "real-utc-hours",
+  "startingQuota": 100,
+  "quotaCapacity": 100,
+  "stoppedGraceHours": 24,
+  "defaultPolicy": "normal",
+  "policies": {
+    "conserve": {
+      "label": "節約",
+      "fullQuotaHours": 168,
+      "researchPerHour": 0.35
+    },
+    "normal": {
+      "label": "ふつう",
+      "fullQuotaHours": 120,
+      "researchPerHour": 1
+    },
+    "sprint": {
+      "label": "全力",
+      "fullQuotaHours": 72,
+      "researchPerHour": 1.6
+    }
+  },
+  "eras": [
+    {
+      "id": "stone",
+      "label": "石器時代",
+      "research": 0,
+      "landmark": "たき火と小屋"
+    },
+    {
+      "id": "agriculture",
+      "label": "農耕時代",
+      "research": 2,
+      "landmark": "畑と風車"
+    },
+    {
+      "id": "kingdom",
+      "label": "王国時代",
+      "research": 12,
+      "landmark": "市場と城"
+    },
+    {
+      "id": "industry",
+      "label": "工業時代",
+      "research": 48,
+      "landmark": "工場と鉄道"
+    },
+    {
+      "id": "information",
+      "label": "情報時代",
+      "research": 144,
+      "landmark": "高層ビルとデータセンター"
+    },
+    {
+      "id": "future",
+      "label": "未来文明",
+      "research": 300,
+      "landmark": "空中都市と宇宙港"
+    }
+  ],
+  "reset": {
+    "trigger": "confirmed-notice-only",
+    "scope": "codex-global",
+    "effectiveTime": "post-published-at",
+    "effect": "set-quota-to-capacity",
+    "sameTimestampPriority": "reset-before-extinction",
+    "stacking": false,
+    "revivesExtinctGeneration": false,
+    "maxUnclaimedRebirthSeeds": 1
+  },
+  "persistence": "local-first-no-ranked-leaderboard",
+  "demo": {
+    "separateStorage": true,
+    "secondsPerGameHour": 0.3333333333333333,
+    "sampleResetHours": [
+      96,
+      192,
+      288
+    ],
+    "label": "体験モード・サンプル告知・1秒＝3時間"
+  },
+  "calibrationNote": "Provisional balance assumes the user-reported rough reset cadence of once every four days. This is not a guaranteed schedule or a calibrated forecast."
+}

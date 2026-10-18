@@ -1,61 +1,88 @@
-# TIBO SIMULATOR
+# tiboっち : civilization
 
-A one-button city simulation game built for the DevDay Community Hackathon.
+A small agent civilization raised by real-world Tibo reset announcements. Choose a work pace, return later, and watch a stone-age settlement grow into a future city. The previous two-minute RESET-button prototype remains at `/arcade.html`.
 
-**Tibo presses RESET. Six resident agents choose how to work. Keep the city growing for two minutes.** You have three resets; each restores everyone's game-only capacity and starts a 20-second cooldown. A depleted agent pauses while its work progress remains. Complete timed projects to grow the city and earn civilization points.
+The large lime percentage at the top is Reset Watch's **next-24-hour reset forecast**, derived from X posts through Decisions API. It is distinct from the civilization's remaining quota. Confidence and the original analysis time are shown alongside it; weak evidence is labeled as a reference estimate. Refused, expired or stale forecasts are shown as unavailable rather than a fabricated probability. The original black/lime/pink visual style, oversized typography and Tibo portrait continue through the game.
 
-## Run locally
+## Play locally
 
-Requires Node.js 22 or newer. No package installation is needed.
+Requires Node.js 22 or newer. No dependencies or API key are needed for the civilization game.
 
 ```sh
+cd cow
 npm run dev
 ```
 
-Open `http://localhost:4173`. The startup command loads `.env.local` when present. The game uses its built-in local decision rules unless the server has `OPENAI_API_KEY` configured. Use Codex's secure OpenAI Platform key setup flow for credential configuration; never paste a key into the game, source files, or documentation. Local `.env*` files are ignored by Git. The local server serves only the five named frontend files and does not expose environment files or backend source.
+Open `http://localhost:4173`. The server reads the public snapshot from [Tibo Reset Watch](https://tibo-reset-watch.soumame.chatgpt.site/); it does not call OpenAI or X itself. The page polls this same-origin endpoint once a minute, with a one-minute server cache. No cookies or caller credentials are forwarded. The public feed must remain accessible for live synchronization.
 
-## Decisions API
+The startup command can load a local ignored `.env.local` for the archived arcade's optional API feature. The civilization game never reads that key in the browser. Only explicitly allowlisted frontend files are served.
 
-The Vercel function in `api/decisions.js` sends one Decisions API request per decision interval, asking six independent `choice` questions in one request. Each resident chooses `conserve`, `standard`, or `sprint` for the next ten seconds. The fixed game rules apply its speed and capacity costs. The model does not score the run or change game rules.
+## Rules
 
-The model receives each department's capacity and progress, the active shared project, and its deadline. Its choices affect the actual work speed and capacity consumption; the player still controls only RESET. See the [official Decisions API guide](https://developers.openai.com/api/docs/guides/decisions) for the batched `choice` interface.
+| Pace | Full quota lasts | Growth per hour |
+| --- | --- | --- |
+| Conserve | 7 days | 0.35 |
+| Normal | 5 days | 1 |
+| Sprint | 3 days | 1.6 |
 
-If the key is absent or an API request fails, the game continues with a local rules-based fallback. Failed requests remain retryable. The status becomes live only after six distinct, valid choices arrive; refusals, partial answers, duplicates, and unknown modes use the fallback instead. The result screen reports actual successful API use.
+The initial civilization starts at 100% quota. Work consumes quota and increases cumulative research. Era thresholds are 0, 2, 12, 48, 144 and 300 research: stone, agriculture, kingdom, industry, information and future. At normal pace with timely resets, the future arrives after 12.5 days of work.
 
-The endpoint validates the six known agent IDs and bounded values, has a per-process in-memory request cap, and uses a five-second upstream timeout. The in-memory cap is a best-effort guard for a small hackathon demo, not distributed abuse prevention.
+- An eligible completed-reset announcement restores game quota to exactly 100%; predictions and future promises never refill it.
+- At 0%, work stops. After another 24 hours without a reset, the civilization becomes extinct. A reset at the exact deadline still rescues it.
+- A later real reset offers one seed for a new generation. An extinct generation remains a memorial, and the announcement backlog cannot fund unlimited retries.
+- A persistent timestamped journal reconstructs growth while the page is closed. The game is saved in this browser, not to a cross-device account.
+- Unknown collection periods cannot finalize extinction. Delayed historical notices replay at their publication time, not their arrival time.
 
-## Build and deploy
+**Two-minute experience mode** uses a separate temporary civilization. One second represents three hours, with clearly labeled sample announcements every four game days. The no-reset scenario shows exhaustion and extinction. Demo actions never modify the real civilization.
+
+## Decisions API connection
+
+Reset Watch uses Decisions API to classify posts and estimate a future reset. This game consumes its existing public report; it adds no per-player model calls. It accepts `signalKind: completed` at classification confidence ≥0.8 from signal-scoring versions 2 and 3, or the equivalent legacy `already_reset` classification. Only @thsottiaux, the `codex` target and recognized X collection sources are eligible. Refusals, unavailable images, forecasts, imported reports and other products cannot refill the city.
+
+The threshold is an explicit game rule, not a calibrated guarantee. A completed notice is not independent verification of anyone's actual Codex account. Distinct posts reporting the same real reset lack a common upstream event ID and can currently count separately; repeat polling of the same post cannot. Forecast confidence and probability remain separate from accepted-reset classification.
+
+Collection continuity uses `collectedAt`, `asOf` and the actual oldest post in the rolling window. If the feed is unavailable or the user's absence outlasts that window, the game shows an unconfirmed state instead of declaring a missing reset. Low-confidence classifications do not count under the game rule; they do not stop the collection clock.
+
+## Integrate into Reset Watch later
+
+The component is self-contained under `civilization/` and uses Shadow DOM to avoid changing the host's styles. With the actual Site source available:
+
+```sh
+node cow/install-reset-watch.mjs tibo-reset/site/public
+```
+
+The installer places the card before the existing timeline and copies only its browser assets. It is idempotent, retains the existing prediction/timeline UI, and reads `/snapshot.json` on the host. It does not overwrite the Worker, secrets or publishing identity. Then validate and publish using the existing Site owner's source workflow. Installing files locally does not deploy the hosted Site.
+
+To mount manually, import `mountCivilization` from `widget.js`, provide an element and normalized feed, then call `updateSnapshot(feed)` after fresh collection. `reset-feed.js` converts the upstream report into that feed; persist its result as `previous`. The engine processes cumulative notices by ID and timestamp.
+
+## Validate and deploy
 
 ```sh
 npm test
 npm run build
 ```
 
-`build.mjs` recreates `dist/` from an explicit allowlist: `index.html`, `game.js`, `style.css`, `details.css`, and `assets/tibo-avatar.jpg`. It rejects symlinked assets and never copies environment files, backend source, tests, or unlisted assets into the public output.
+Tests cover multi-day balance, exact reset/death boundaries, offline reconstruction, duplicate notices, source filtering, feed gaps, rebirth, bounded proxy requests and public-build isolation. Network calls are mocked in the test suite. `build.mjs` recreates `dist/` from the explicit list in `public-assets.mjs`; environment files, backend code, tests and unlisted assets never enter it.
 
-For Vercel, import the repository with **Root Directory `cow`** and **Framework Preset Other**. The checked-in `vercel.json` selects `npm run build` and output directory `dist`. Vercel builds `api/decisions.js` separately as a Node.js function, including its shared `src/decisions.js` implementation. Configure `OPENAI_API_KEY` through the host's protected server environment settings; do not use a `VITE_`, `NEXT_PUBLIC_`, or other browser-exposed variable. The configuration follows [Vercel's project configuration reference](https://vercel.com/docs/project-configuration/vercel-json).
-
-A static-only host can serve the game but cannot run its Decisions API endpoint. Deployment and a check of the public `/api/decisions` endpoint are separate from a successful local build. The hackathon submission requires both a public repository URL and a working deployed URL by 17:15 JST on October 18, 2026.
-
-## Judging criteria
-
-**New features:** Decisions API chooses six departments' work modes from the shared city state in one request, and those choices change the simulation. **Usability:** one gameplay button, visible capacity meters, a short two-minute run, keyboard operation, and a clear replay path make the rules immediately testable. **Usefulness:** the result screen shows RESET recovery efficiency and city uptime, letting players see the tradeoff between waste and downtime; this is a resource-management sandbox, not a model of real Codex quotas. **Originality:** the reset-ticket joke becomes a city whose agents plead for help and restart together, with Tibo cast as the player's reset god. Demonstrate the API status and one crisis-to-reset sequence so these claims are visible during the three-minute presentation.
+For Vercel, use Root Directory `cow`, Framework Preset Other, and the checked-in `vercel.json`. It builds the static files and `/api/reset-watch` function. The new game needs no environment key. A static host can serve experience mode, but live play requires a same-origin snapshot endpoint or the server proxy. The game has not been deployed merely because its local build passes.
 
 ## Project layout
 
-- `index.html`, `style.css`, `details.css`, `game.js`: game UI, simulation, and presentation.
-- `src/decisions.js`: shared validation, local fallback, and OpenAI API call.
-- `api/decisions.js`: Vercel serverless adapter.
-- `server.mjs`: dependency-free local static server and API adapter.
-- `build.mjs`, `vercel.json`: allowlisted static build and serverless deployment configuration.
-- `tests/`: isolated API, gameplay, and build-output regression checks.
+- `index.html`, `civilization-page.css`: standalone game page.
+- `civilization/widget.js`, `widget.css`, `scene.js`: responsive component, persistent browser state, sample mode and evolving town.
+- `civilization/engine.js`: deterministic policy, era, reset and extinction rules.
+- `civilization/reset-feed.js`: existing Reset Watch report adapter.
+- `civilization/forecast-view.js`: independent forecast display, confidence and freshness rules.
+- `civilization/bootstrap.js`: one-minute public-feed refresh and component mounting.
+- `src/reset-watch.js`, `api/reset-watch.js`: fixed-upstream public snapshot proxy.
+- `install-reset-watch.mjs`: deferred Site integration without rewriting host code.
+- `design/`: detailed four-day-cadence rules and integration proposal.
+- `arcade.html`, `game.js`, `style.css`, `details.css`, `src/decisions.js`: archived original prototype.
 
-The game is an independent fan-made project and is not affiliated with OpenAI. Its RESET charges are fictional game resources.
+## Judging
 
-## Validation
-
-Run `npm test` for deterministic game-balance, reset/cooldown, replay, API validation, fallback/recovery, and build-output isolation checks. API tests use mocked responses and do not spend API credits. Build tests place private sentinel files in a temporary fixture and verify that none reach the public output. Live connection status is shown only after six valid decisions have been received.
+**New-feature use:** Decisions API's completed-reset classifications directly change a persistent game's resources. **Usability:** three meaningful pace choices, a visual town, offline growth, and an isolated two-minute demonstration. **Usefulness:** a playful reason to revisit the reset tracker and experience the tradeoff between throughput and limited resources. **Originality:** real-world public announcements become events that sustain an agent civilization. This is a fan game, not a productivity benchmark or a service that grants real quotas.
 
 ## Portrait attribution
 
-The Tibo portrait is the publicly published [tibo-openai GitHub avatar](https://github.com/tibo-openai), downloaded from `https://avatars.githubusercontent.com/u/177053821?s=400&v=4`. [The Dev Interrupted interview](https://linearb.io/dev-interrupted/podcast/openai-codex-thibault-sottiaux-agentic-autonomy) links this GitHub account and @thsottiaux. The photograph is a third-party asset, not included in any license grant for the game code. Its use does not imply endorsement.
+The portrait is the publicly published [tibo-openai GitHub avatar](https://github.com/tibo-openai). [The Dev Interrupted interview](https://linearb.io/dev-interrupted/podcast/openai-codex-thibault-sottiaux-agentic-autonomy) links this account and @thsottiaux. The photograph is a third-party asset, not included in any license grant for the game code. This project is unofficial and implies no endorsement by Tibo or OpenAI.

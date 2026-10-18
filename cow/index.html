@@ -1,69 +1,38 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#0a1220" />
-  <meta name="description" content="あなたはTibo。3回のRESETでAIエージェントの街を救う、2分間のワンボタンゲーム。" />
-  <title>TIBO SIMULATOR — 街の神さまは、リセット係。</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@500;600;700;800;900&family=Noto+Sans+JP:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/style.css" />
-  <link rel="stylesheet" href="/details.css" />
-  <script type="module" src="/game.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a0a0d">
+  <meta name="description" content="Tiboがリセットすると、小さな文明が息を吹き返す。現実の投稿とつながる、エージェント文明育成ゲーム。">
+  <title>tiboっち : civilization</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23101511'/%3E%3Ctext x='32' y='46' text-anchor='middle' font-size='44'%3E🌱%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/civilization-page.css">
+  <script type="module" src="/civilization/bootstrap.js"></script>
 </head>
 <body>
-  <main class="shell" id="top">
-    <header class="topbar">
-      <a class="wordmark" href="#top" aria-label="TIBO SIMULATOR ホーム"><span class="wordmark-orbit" aria-hidden="true">↻</span>TIBO<span class="wordmark-light">SIMULATOR</span></a>
-      <div class="topbar-right"><span class="season-tag">ONE BUTTON. A WHOLE CIVILIZATION.</span><button class="sound-toggle" id="sound-toggle" type="button" aria-pressed="false" aria-label="サウンドをオンにする"><span aria-hidden="true">♫</span><span class="sound-text">SOUND OFF</span></button></div>
+  <a class="skip-link" href="#tibo-civilization">文明のお世話へ</a>
+  <div class="page-shell">
+    <header class="masthead">
+      <a class="wordmark" href="/" aria-label="tiboっち ホーム"><span aria-hidden="true">✳</span> tiboっち<span class="edition">CIVILIZATION</span></a>
+      <div class="header-actions"><a class="watch-link" href="https://tibo-reset-watch.soumame.chatgpt.site/" target="_blank" rel="noopener noreferrer">RESET WATCH <span aria-hidden="true">↗</span></a><button class="motion-toggle" type="button" data-motion-toggle aria-label="アニメーションを停止" aria-pressed="false">Ⅱ</button></div>
     </header>
-    <section class="intro-row" aria-labelledby="game-title">
-      <div><p class="eyebrow">YOU ARE TIBO. THEY NEED A RESET.</p><h1 id="game-title">街の神さまは、<span>リセット係。</span></h1><p class="subtitle">働くほど枠が減るAIたち。<strong>3回のRESET</strong>で、2分間の文明を育てよう。<br /><span class="quick-rules">0%で停止。押すと全員100%へ。ただし、次のRESETまで20秒。</span></p></div>
-      <div class="api-pill" id="api-status" data-mode="checking" role="status"><span class="api-pulse"></span><span class="api-copy">接続を確認中</span></div>
-    </section>
-    <section class="game-layout" aria-label="Tibo Simulator ゲーム">
-      <div class="game-column">
-        <section class="world-card" id="world-card" aria-label="街の状況">
-          <div class="world-topline"><div class="city-name"><span class="city-spark" aria-hidden="true">◈</span><div><strong>RESET CITY</strong><small id="city-stage">眠っている街</small></div></div><div class="live-count"><span class="legend-dot"></span>稼働 <strong id="active-agents">6 / 6</strong></div><div class="run-clock"><span class="clock-label">残り時間</span><strong id="timer">02:00</strong></div></div>
-          <div class="skyline-wrap" id="skyline-wrap">
-            <div class="skyline-sun" aria-hidden="true"></div><div class="skyline-stars" aria-hidden="true">✦<span>✧</span>✦</div><div class="far-city" aria-hidden="true"></div>
-            <div class="skyline city-level-0" id="skyline" role="img" aria-label="まだ眠っている街">
-              <div class="tower tower-a" data-agent="medical"><span class="roof-sign">＋</span><strong class="building-quota">100%</strong><div class="windows"><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="building-name">CLINIC</span><b class="door"></b><span class="resident">🚑</span><span class="building-alert">枠切れ</span></div>
-              <div class="tower tower-b" data-agent="transit"><span class="roof-sign">↔</span><strong class="building-quota">100%</strong><div class="windows"><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="building-name">TRANSIT</span><b class="door"></b><span class="resident">🚕</span><span class="building-alert">枠切れ</span></div>
-              <div class="tower tower-c" data-agent="factory"><span class="roof-sign">⚙</span><span class="smoke" aria-hidden="true"></span><strong class="building-quota">100%</strong><div class="windows"><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="building-name">FACTORY</span><b class="door"></b><span class="resident">🤖</span><span class="building-alert">枠切れ</span></div>
-              <div class="tower tower-d" data-agent="delivery"><span class="roof-sign">🍕</span><strong class="building-quota">100%</strong><div class="windows"><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="building-name">DELIVERY</span><b class="door"></b><span class="resident">🛵</span><span class="building-alert">枠切れ</span></div>
-              <div class="tower tower-e" data-agent="romance"><span class="roof-sign">♥</span><strong class="building-quota">100%</strong><div class="windows"><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="building-name">LOVE LAB</span><b class="door"></b><span class="resident">💌</span><span class="building-alert">枠切れ</span></div>
-              <div class="tower tower-f" data-agent="entertainment"><span class="roof-sign">★</span><strong class="building-quota">100%</strong><div class="windows"><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="building-name">ARCADE</span><b class="door"></b><span class="resident">🎮</span><span class="building-alert">枠切れ</span></div>
-              <div class="skyline-road"></div><div class="road-lanes"></div><span class="city-car car-one" aria-hidden="true"></span><span class="city-car car-two" aria-hidden="true"></span>
-            </div>
-            <div class="skyline-label" id="skyline-label"><span class="skyline-status-dot"></span> 街の起動を待っています</div>
-            <div class="reset-flash" aria-hidden="true"><span>LIMITS RESTORED</span><strong>みんな、再起動。</strong></div>
-          </div>
-          <div class="world-footer"><div class="dev-readout"><span class="clock-label">文明レベル</span><strong><span id="score">000</span><small> PTS</small></strong><div class="dev-track"><span id="dev-bar"></span></div></div><div class="next-build"><span class="clock-label">次の発展</span><strong id="next-build">最初の灯り <span>· 18 PTS</span></strong></div></div>
-        </section>
-        <section class="district-section" aria-labelledby="district-title">
-          <div class="section-heading"><div><h2 id="district-title">働き方は、agentにおまかせ。</h2><p>AIが「節約・通常・全力」を選択。あなたはRESETのタイミングだけ。</p></div><div class="legend"><span class="legend-dot"></span>利用枠</div></div>
-          <div class="agents-grid" id="agents-grid"></div>
-        </section>
-      </div>
-      <aside class="control-column" aria-label="RESET操作と街のメッセージ">
-        <div class="control-card">
-          <div class="control-head"><span class="live-badge"><i></i> RESET CONTROL</span><span id="run-number" class="run-number">RUN 001</span></div>
-          <div class="commander"><div class="portrait-frame"><img src="/assets/tibo-avatar.jpg" alt="Tiboの公開プロフィール写真" width="76" height="76" /><span class="portrait-level">GOD LV. 1</span></div><div><p class="god-label">TODAY'S RESET GOD</p><h2 class="control-title">Tibo <span>← あなた</span></h2><span class="commander-tag">みんなの枠を握る人</span></div></div>
-          <div class="charge-row"><span>残りRESET</span><strong id="charges"><span class="charge-dot"></span><span class="charge-dot"></span><span class="charge-dot"></span></strong></div>
-          <p class="control-description" id="control-description">3回だけ、全員の利用枠を100%へ。<br />早すぎれば無駄に、遅すぎれば街が止まる。</p>
-          <p class="city-warning" id="city-warning">0%で停止。RESETで全員100%へ。</p><div class="button-frame" id="button-frame"><div class="button-aura" aria-hidden="true"></div><button class="reset-button" id="reset-button" type="button" aria-label="街を起動する"><span class="button-ring" aria-hidden="true"></span><span class="button-label" id="button-label">START</span><span class="button-sub" id="button-sub">街を起動する</span></button></div>
-          <div class="cooldown-readout"><span class="cooldown-mark" id="cooldown-mark">↻</span><span id="cooldown-text">RESET後は20秒待機</span></div>
-          <p class="rule-note"><span class="rule-icon" aria-hidden="true">!</span><span><strong>0%のagentは仕事を停止。</strong><br />RESETすると全員100%に戻ります。</span></p>
-        </div>
-        <section class="inbox-card" aria-labelledby="inbox-title"><div class="inbox-heading"><h2 id="inbox-title">🙏 Tibo、枠ください。</h2><span class="inbox-count" id="inbox-count">00</span></div><div class="message-list" id="message-list" role="log" aria-label="街からのメッセージ" aria-live="polite" aria-relevant="additions"></div></section>
-      </aside>
-    </section>
-    <footer class="page-footer"><span>非公式ファンゲーム。利用枠とRESETはゲーム内だけのものです。</span><a href="https://github.com/tibo-openai" target="_blank" rel="noopener noreferrer">Tibo portrait ↗</a><span>DEV DAY COMMUNITY HACKATHON · TOKYO 2026</span></footer>
-  </main>
-  <dialog class="result-dialog" id="result-dialog" aria-labelledby="result-title"><form method="dialog" class="result-shell"><div class="eyebrow">YOUR CITY. YOUR TIMING.</div><div class="result-spark" aria-hidden="true">✦</div><h2 id="result-title">あなたが育てた、2分間。</h2><p class="result-summary" id="result-summary"></p><div class="result-score"><strong id="final-score">000</strong><span>文明 PTS</span></div><div class="result-stats" id="result-stats"></div><p class="result-verdict" id="result-verdict"></p><button class="play-again" id="play-again" type="button"><span>もう一度、街を救う</span><span aria-hidden="true">↻</span></button><button class="result-close" value="close">街を見る</button></form></dialog>
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <main>
+      <section class="forecast-hero" aria-label="24時間以内のリセット予測">
+        <div class="forecast-watermark" aria-hidden="true">RESET?</div>
+        <div class="forecast-main"><p class="kicker">CODEX · NEXT 24 HOURS</p><h2 class="forecast-heading">24時間以内のリセット確率</h2><div class="forecast-number" aria-label="予測を読み込み中"><strong data-forecast-value>—</strong><span>%</span></div><p class="forecast-status" data-forecast-label>予測データを確認中</p><p class="forecast-confidence" data-forecast-confidence>信頼度 —</p></div>
+        <div class="forecast-story"><span class="hero-sticker">NO RESET. NO FUTURE.</span><p class="kicker">TIBOっち : CIVILIZATION</p><h1>神さま、<br>あと少しだけ。<span aria-hidden="true">✦</span></h1><p class="intro-copy">働くほど、枠がへる。RESETが来ると、また育つ。<br>次の告知を予想して、エージェント文明を未来まで。</p><a class="play-link" href="#tibo-civilization">文明を育てる <span aria-hidden="true">↓</span></a></div>
+        <div class="forecast-bottom"><span>DECISIONS API × TIBO RESET WATCH</span><span data-forecast-updated>更新時刻を確認中</span></div>
+      </section>
+      <section id="tibo-civilization" aria-label="文明のお世話" data-snapshot-url="/api/reset-watch" data-asset-base="/assets/"></section>
+      <div class="ticker" aria-hidden="true"><div>WORK. WAIT. EVOLVE. <span>✦</span> PLEASE, TIBO! <span>↻</span> NO RESET. NO FUTURE. <span>✦</span> WORK. WAIT. EVOLVE. <span>↻</span></div></div>
+      <section class="how-to" aria-label="遊び方">
+        <div><span class="step">01</span><p><strong>ペースを選ぶ</strong><span>節約・ふつう・全力。速く育つほど、枠も早く減ります。</span></p></div>
+        <div><span class="step">02</span><p><strong>告知を待つ</strong><span>Tiboの実施報告を検知すると、枠が100%に回復。</span></p></div>
+        <div><span class="step">03</span><p><strong>未来まで育てる</strong><span>石器時代から未来文明へ。閉じている間も時は進みます。</span></p></div>
+      </section>
+    </main>
+    <footer><p>tiboっち : civilization <span>UNOFFICIAL FAN GAME</span></p><details><summary>ゲームとデータについて</summary><p>表示する確率は、Xの投稿から推測した未校正のモデル予測です。「信頼度」は根拠の充足度で、的中率ではありません。根拠不足時は参考値と表示し、取得失敗・期限切れでは確率を表示しません。最新の投稿と解析内容は Reset Watch で確認できます。</p><p>Reset Watch が Decisions API で「実施済み」と分類した、確信度80%以上のCodex全体向け告知をゲーム内の回復に使います。予告や予測確率では回復しません。実際のCodexアカウントの利用枠は変更しません。</p><p>データの取得が途切れた場合は、未確認期間の滅亡を確定せず、確認を待ちます。文明はこのブラウザに保存されます。データを消去した場合や別の端末では引き継がれません。体験モードは本番とは別のサンプルです。</p><p>Tibo portrait: <a href="https://github.com/tibo-openai" target="_blank" rel="noopener noreferrer">tibo-openai</a> · 投稿解析: <a href="https://tibo-reset-watch.soumame.chatgpt.site/" target="_blank" rel="noopener noreferrer">Tibo Reset Watch</a></p></details></footer>
+  </div>
 </body>
 </html>

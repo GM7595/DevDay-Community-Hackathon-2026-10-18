@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { buildSite } from "../build.mjs";
 
-const expectedFiles = ["assets/tibo-avatar.jpg", "details.css", "game.js", "index.html", "style.css"];
+const expectedFiles = ["arcade.html", "assets/tibo-avatar.jpg", "civilization-page.css", "civilization/bootstrap.js", "civilization/engine.js", "civilization/forecast-view.js", "civilization/reset-feed.js", "civilization/scene.js", "civilization/widget.css", "civilization/widget.js", "details.css", "game.js", "index.html", "style.css"];
 
 async function fixture(t) {
   const root = await mkdtemp(path.join(os.tmpdir(), "tibo-build-test-"));

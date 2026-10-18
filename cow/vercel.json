@@ -4,6 +4,10 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
+    "api/reset-watch.js": {
+      "includeFiles": "src/reset-watch.js",
+      "maxDuration": 15
+    },
     "api/decisions.js": {
       "includeFiles": "src/decisions.js",
       "maxDuration": 10

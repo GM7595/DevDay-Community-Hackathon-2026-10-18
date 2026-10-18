@@ -1,9 +1,9 @@
 import { lstat, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { publicFiles } from './public-assets.mjs';
 
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
-const publicFiles = ["index.html", "game.js", "style.css", "details.css", "assets/tibo-avatar.jpg"];
 
 export async function buildSite(sourceRoot = projectRoot) {
   const root = await realpath(sourceRoot);
