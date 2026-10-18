@@ -258,6 +258,8 @@ function renderAgent(agent) {
     tower.classList.toggle("is-stopped", quota <= 0);
     tower.classList.toggle("is-low", quota > 0 && quota <= 28);
     tower.dataset.mode = agent.mode;
+    const label = tower.querySelector(".building-quota");
+    if (label) label.textContent = `${Math.floor(quota)}%`;
   }
 }
 
@@ -280,27 +282,27 @@ function updateButton() {
   const title = el("button-label");
   const subtitle = el("button-sub");
   if (state.status === "ready") {
-    title.innerHTML = "START<br />THE CITY";
+    title.innerHTML = "START <br />THE CITY";
     subtitle.textContent = "街を動かす";
     button.setAttribute("aria-label", "街を起動する");
     button.disabled = false;
   } else if (state.status === "finished") {
-    title.innerHTML = "PLAY<br />AGAIN";
+    title.innerHTML = "PLAY <br />AGAIN";
     subtitle.textContent = "もう一度つくる";
     button.setAttribute("aria-label", "新しい街でもう一度遊ぶ");
     button.disabled = false;
   } else if (state.charges <= 0) {
-    title.innerHTML = "NO<br />CHARGES";
+    title.innerHTML = "NO <br />CHARGES";
     subtitle.textContent = "チケットを使い切りました";
     button.setAttribute("aria-label", "RESETチケットを使い切りました");
     button.disabled = true;
   } else if (state.cooldown > 0) {
-    title.innerHTML = "RESET<br />WAIT";
+    title.innerHTML = "RESET <br />WAIT";
     subtitle.textContent = "再使用まで少し待って";
     button.setAttribute("aria-label", `RESETクールダウン中、あと${Math.ceil(state.cooldown)}秒`);
     button.disabled = true;
   } else {
-    title.innerHTML = "RESET<br />ALL LIMITS";
+    title.innerHTML = "RESET <br />ALL LIMITS";
     subtitle.textContent = `残り ${state.charges} 回`;
     button.setAttribute("aria-label", "全agentの利用枠を100%に戻す");
     button.disabled = false;
@@ -316,13 +318,13 @@ function updateButton() {
 function updateCooldown() {
   const text = el("cooldown-text");
   if (state.status === "ready") {
-    text.textContent = "2分間 · RESETは3回";
+    text.textContent = "RESETは3回 · 使用後20秒待機";
     el("cooldown-mark").textContent = "↻";
   } else if (state.status === "finished") {
     text.textContent = `RESET ${state.resets} 回 · 終了`;
     el("cooldown-mark").textContent = "✳";
   } else if (state.cooldown > 0) {
-    text.textContent = `あと ${Math.ceil(state.cooldown)} 秒でRESET可能`;
+    text.textContent = `残り ${state.charges} 回 · あと ${Math.ceil(state.cooldown)} 秒`;
     el("cooldown-mark").textContent = "↻";
   } else {
     text.textContent = state.charges ? `残り ${state.charges} 回 · RESETできます` : "チケットはありません · 街を見届けよう";
@@ -520,6 +522,14 @@ function updateProgressLabels() {
   el("skyline-wrap").classList.toggle("city-stopped", stopped === state.agents.length);
   const active = el("active-agents");
   if (active) active.textContent = `${state.agents.length - stopped} / ${state.agents.length}`;
+  const warning = el("city-warning");
+  if (warning) {
+    const lowest = [...state.agents].sort((a, b) => a.quota - b.quota)[0];
+    const load = state.activeEvent && lowest.id in state.activeEvent.requirements ? 1.2 : 1;
+    const seconds = Math.ceil(lowest.quota / (QUOTA_DRAIN * lowest.wear * WORK_MODES[lowest.mode].drain * (1 + Math.min(.45, state.score / 420)) * load));
+    warning.textContent = state.status === "ready" ? "0%で停止。RESETで全員100%へ。" : state.status === "finished" ? "2分間が終了。もう一度遊べます。" : stopped ? `${stopped}部署が停止中 · RESETを待っています` : `${lowest.name} ${Math.floor(lowest.quota)}% · この働き方なら約${seconds}秒で停止`;
+    warning.classList.toggle("is-urgent", stopped > 0 || lowest.quota <= 28);
+  }
 }
 
 function frame(now) {
@@ -641,6 +651,7 @@ function finishRun() {
   updateButton();
   updateCooldown();
   logMessage("街は休息に入ります。おやすみなさい、Tibo。", "good", "SIMULATION OVER");
+  updateProgressLabels();
   showResults();
 }
 
@@ -653,7 +664,7 @@ function showResults() {
   el("final-score").textContent = String(score).padStart(3, "0");
   const efficiency = state.resets ? Math.round(state.resetHistory.reduce((sum, item) => sum + item.restored, 0) / (state.resets * 600) * 100) : null;
   const uptime = Math.round((1 - state.agents.reduce((sum, agent) => sum + agent.stoppedFor, 0) / 720) * 100);
-  const hint = !state.resets ? "チケットを使えば、止まった街がまた動き出します。" : efficiency < 55 ? "余った枠が多め。次は、もう少し減るまでRESETを待ってみよう。" : uptime < 80 ? "回復を待つ時間が長め。街の計画に合わせてRESETを少し早く。" : "枠を使い切りながら、街を動かし続けました。次は計画を全部達成しよう。";
+  const hint = !state.resets ? "チケットを使えば、止まった街がまた動き出します。" : efficiency < 55 ? "余った枠が多め。次は、もう少し減るまでRESETを待ってみよう。" : uptime < 80 ? "回復を待つ時間が長め。街の計画に合わせてRESETを少し早く。" : state.completedEvents === EVENTS.length ? "4つの計画をすべて達成！次は、街の停止時間をさらに減らそう。" : "枠を使い切りながら、街を動かし続けました。次は計画を全部達成しよう。";
   el("result-verdict").textContent = hint;
   const stats = [
     [state.completedTasks, "仕事を完了"],
@@ -700,6 +711,7 @@ function startNewRun() {
   state.decisionPending = false;
   state.apiDecisions = 0;
   state.localDecisions = 0;
+  updateApiStatus(state.apiConfigured ? "available" : "local", state.apiConfigured ? "Decisions API · 最初の判断を待機" : "ローカル判断 · API未接続");
   state.resetHistory = [];
   if (state.apiConfigured) updateApiStatus("available", "Decisions API · 最初の判断を待機");
   state.lastCooldownSecond = -1;
